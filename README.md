@@ -2,6 +2,7 @@
 
 [![OpenTelemetry](https://img.shields.io/badge/OpenTelemetry-v1.20+-blue.svg?logo=opentelemetry)](https://opentelemetry.io/)
 [![OTLP/HTTP](https://img.shields.io/badge/Wire_Protocol-OTLP%20Protobuf-success.svg)](https://opentelemetry.io/docs/specs/otlp/)
+[![GitHub Pages](https://img.shields.io/badge/Live%20Demo-GitHub%20Pages-brightgreen.svg)](https://emrahman.github.io/OpenTelemetry_Testing/)
 [![Python](https://img.shields.io/badge/Python-3.9%20%7C%203.10%2B-blue.svg?logo=python)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/Ingestion_Engine-FastAPI%20%2B%20WebSockets-teal.svg?logo=fastapi)](https://fastapi.tiangolo.com/)
 [![License](https://img.shields.io/badge/License-MIT-lightgrey.svg)](LICENSE)
@@ -17,10 +18,9 @@ This repository contains both:
 
 ## 🌟 Interactive Architecture & GitHub Pages
 
-An interactive, dark-themed visual architecture viewer is included in [`docs/index.html`](docs/index.html).
+👉 **Live Interactive Architecture Viewer:** **[https://emrahman.github.io/OpenTelemetry_Testing/](https://emrahman.github.io/OpenTelemetry_Testing/)**
 
-> 💡 **GitHub Pages Deployment**:  
-> In your GitHub repository settings, navigate to **Settings ➔ Pages ➔ Build and deployment**, select **Deploy from a branch**, and choose `/docs` as the source folder. Your repository will immediately serve the interactive architecture page.
+The architecture documentation is deployed directly from the [`docs/`](docs/) directory via GitHub Pages.
 
 ---
 
