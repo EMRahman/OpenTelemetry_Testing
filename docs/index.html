@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Architecture & Scale Analysis: Local POC vs 10,000-Node Enterprise Grid</title>
+  <style>
+    :root {
+      --bg: #090d16;
+      --surface: #111827;
+      --surface-border: #1f293d;
+      --card-bg: #162032;
+      --card-border: #24344d;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --primary: #38bdf8;
+      --secondary: #818cf8;
+      --accent: #a855f7;
+      --green: #22c55e;
+      --yellow: #eab308;
+      --red: #ef4444;
+      --cyan: #06b6d4;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      padding-bottom: 4rem;
+    }
+
+    /* Top Navigation */
+    .top-nav {
+      position: sticky;
+      top: 0;
+      background: rgba(17, 24, 39, 0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--surface-border);
+      z-index: 100;
+      padding: 0.85rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-weight: 700;
+      font-size: 1.15rem;
+      color: #fff;
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 0.5rem;
+      background: #0b1120;
+      padding: 0.25rem;
+      border-radius: 8px;
+      border: 1px solid var(--surface-border);
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 0.45rem 1rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .tab-btn.active {
+      background: var(--primary);
+      color: #0f172a;
+    }
+
+    .tab-btn:hover:not(.active) {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .nav-actions a {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.85rem;
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 600;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      padding: 0.4rem 0.85rem;
+      border-radius: 6px;
+      background: rgba(56, 189, 248, 0.08);
+      transition: all 0.2s;
+    }
+    .nav-actions a:hover {
+      background: rgba(56, 189, 248, 0.2);
+    }
+
+    .main-content {
+      max-width: 1280px;
+      margin: 2rem auto 0;
+      padding: 0 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 2.5rem;
+    }
+
+    /* Hero / Banner */
+    .hero-banner {
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    .hero-text h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.5rem;
+      background: linear-gradient(90deg, #38bdf8, #818cf8, #c084fc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-text p {
+      color: var(--text-muted);
+      font-size: 1rem;
+      max-width: 760px;
+    }
+
+    .hero-badges {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      align-items: flex-end;
+    }
+
+    .badge-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 0.35rem 0.75rem;
+      border-radius: 9999px;
+      border: 1px solid;
+    }
+    .badge-green { background: rgba(34, 197, 94, 0.15); color: #4ade80; border-color: rgba(34, 197, 94, 0.3); }
+    .badge-purple { background: rgba(168, 85, 247, 0.15); color: #c084fc; border-color: rgba(168, 85, 247, 0.3); }
+
+    /* Section Headers */
+    .section-title {
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin-bottom: 0.4rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .section-desc {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      margin-bottom: 1.5rem;
+    }
+
+    /* Diagram Panels */
+    .tab-view {
+      display: none;
+    }
+    .tab-view.active {
+      display: block;
+    }
+
+    .diagram-panel {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 2rem;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Visual Flow Architecture Nodes */
+    .flow-pipeline {
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+      position: relative;
+    }
+
+    .pipeline-stage {
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      gap: 1.5rem;
+      align-items: stretch;
+      position: relative;
+    }
+
+    @media (max-width: 900px) {
+      .pipeline-stage {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .stage-indicator {
+      background: #0f172a;
+      border: 1px solid var(--surface-border);
+      border-radius: 10px;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      border-left: 5px solid var(--primary);
+    }
+
+    .stage-step {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      color: var(--primary);
+      margin-bottom: 0.25rem;
+    }
+
+    .stage-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .stage-subtitle {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+
+    .stage-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+    }
+
+    .node-box {
+      background: #101826;
+      border: 1px solid #1e2d42;
+      border-radius: 10px;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .node-box:hover {
+      transform: translateY(-2px);
+      border-color: #38bdf8;
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+    }
+
+    .node-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .node-name {
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: #f8fafc;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .node-tag {
+      font-size: 0.7rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      font-weight: 700;
+      text-transform: uppercase;
+      background: rgba(255, 255, 255, 0.08);
+      color: #cbd5e1;
+    }
+
+    .node-content {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .signal-data {
+      background: #090e17;
+      border: 1px dashed #24354d;
+      border-radius: 6px;
+      padding: 0.6rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+      font-size: 0.75rem;
+      color: #7dd3fc;
+    }
+
+    .transport-arrow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.5rem;
+      color: var(--primary);
+      font-size: 1.2rem;
+    }
+
+    /* Spec Grid for 10k Server Setup */
+    .grid-2col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+    @media (max-width: 850px) {
+      .grid-2col { grid-template-columns: 1fr; }
+    }
+
+    .grid-3col {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+    }
+    @media (max-width: 950px) {
+      .grid-3col { grid-template-columns: 1fr; }
+    }
+
+    .feature-card {
+      background: #111a2a;
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.8rem;
+    }
+
+    .feature-icon {
+      font-size: 1.75rem;
+    }
+
+    .feature-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .feature-text {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    .spec-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      margin-top: 0.5rem;
+    }
+
+    .spec-table th, .spec-table td {
+      padding: 0.65rem 0.85rem;
+      border: 1px solid #1f2d42;
+      text-align: left;
+    }
+
+    .spec-table th {
+      background: #0f1624;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .spec-table td {
+      background: #131d2e;
+    }
+
+    .callout {
+      border-left: 4px solid var(--accent);
+      background: rgba(168, 85, 247, 0.08);
+      padding: 1rem 1.25rem;
+      border-radius: 0 8px 8px 0;
+      font-size: 0.9rem;
+    }
+
+    .code-pill {
+      font-family: monospace;
+      background: #0b1120;
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      color: #38bdf8;
+      border: 1px solid #1e2d42;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Sticky Navigation Bar -->
+  <header class="top-nav">
+    <div class="nav-brand">
+      <span style="font-size: 1.3rem;">📊</span>
+      <span>OpenTelemetry Telemetry Architecture</span>
+    </div>
+    <div class="nav-tabs">
+      <button class="tab-btn active" onclick="switchTab('local-poc', this)">1. Local POC Setup</button>
+      <button class="tab-btn" onclick="switchTab('scale-arch', this)">2. 10,000-Server Scale Architecture</button>
+      <button class="tab-btn" onclick="switchTab('reliability', this)">3. High Availability & Failover</button>
+      <button class="tab-btn" onclick="switchTab('tooling', this)">4. Recommended OSS Tooling</button>
+    </div>
+    <div class="nav-actions">
+      <a href="dashboard.html" target="_blank">UI Preview (dashboard.html) ↗</a>
+    </div>
+  </header>
+
+  <main class="main-content">
+
+    <!-- Hero Banner -->
+    <section class="hero-banner">
+      <div class="hero-text">
+        <h1>Telemetry Lifecycle & Enterprise Scale Model</h1>
+        <p>From local nanosecond-scale event dispatching (running right now at ~6.6 ms mean latency) to multi-datacenter horizontal scale capable of processing 100,000,000+ signals/minute.</p>
+      </div>
+      <div class="hero-badges">
+        <span class="badge-pill badge-green">● Local Live Test: 6.66 ms E2E Latency</span>
+        <span class="badge-pill badge-purple">▲ Enterprise Target: 10,000 Servers / Multi-Region</span>
+      </div>
+    </section>
+
+    <!-- VIEW 1: LOCAL POC SETUP -->
+    <div id="view-local-poc" class="tab-view active">
+      <div>
+        <h2 class="section-title"><span>🔍</span> Current Local Setup: Creation ➔ Transport ➔ Ingest ➔ GUI</h2>
+        <p class="section-desc">Interactive trace of how telemetry objects flow through the active proof-of-concept pipeline.</p>
+      </div>
+
+      <div class="diagram-panel">
+        <div class="flow-pipeline">
+
+          <!-- STAGE 1: CREATION -->
+          <div class="pipeline-stage">
+            <div class="stage-indicator" style="border-left-color: #22c55e;">
+              <span class="stage-step" style="color: #22c55e;">Stage 1: Creation</span>
+              <h3 class="stage-title">Process Signal</h3>
+              <p class="stage-subtitle">Inside Application Code</p>
+            </div>
+            <div class="stage-cards">
+              <div class="node-box">
+                <div class="node-header">
+                  <span class="node-name">⚙️ Worker Application</span>
+                  <span class="node-tag" style="color: #4ade80;">Python 3.9+</span>
+                </div>
+                <p class="node-content">Application business logic encounters state transition (health check pass, high memory threshold, or 503 DB timeout).</p>
+                <div class="signal-data">
+                  // Trigger in producer.py<br>
+                  logger.warning("Degraded performance", extra={<br>
+                  &nbsp;&nbsp;"state.status": "WARNING",<br>
+                  &nbsp;&nbsp;"system.memory.usage_pct": 82.4,<br>
+                  &nbsp;&nbsp;"emitted_at_ms": 1791822703652<br>
+                  })
+                </div>
+              </div>
+
+              <div class="node-box">
+                <div class="node-header">
+                  <span class="node-name">📦 OpenTelemetry SDK</span>
+                  <span class="node-tag">LoggerProvider</span>
+                </div>
+                <p class="node-content">Wraps log record with global resource attributes (<span class="code-pill">service.name</span>, <span class="code-pill">host.name</span>), injects nanosecond monotonic timestamps, and invokes configured processor.</p>
+                <div class="signal-data">
+                  Resource: {service.name: "order-worker"}<br>
+                  LogRecord: severity=WARN, num=13<br>
+                  Processor: SimpleLogRecordProcessor
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="transport-arrow">⬇ OTLP / HTTP Export (Binary Protobuf Serialization)</div>
+
+          <!-- STAGE 2: TRANSPORT -->
+          <div class="pipeline-stage">
+            <div class="stage-indicator" style="border-left-color: #38bdf8;">
+              <span class="stage-step" style="color: #38bdf8;">Stage 2: Transport</span>
+              <h3 class="stage-title">Network Wire</h3>
+              <p class="stage-subtitle">Wire Protocol & Serialization</p>
+            </div>
+            <div class="stage-cards">
+              <div class="node-box">
+                <div class="node-header">
+                  <span class="node-name">🌐 OTLP Protobuf Serializer</span>
+                  <span class="node-tag">opentelemetry-proto</span>
+                </div>
+                <p class="node-content">Encodes <span class="code-pill">ExportLogsServiceRequest</span> to compressed binary protobuf bytes, eliminating JSON stringifying overhead.</p>
+                <div class="signal-data">
+                  POST /v1/logs HTTP/1.1<br>
+                  Host: 127.0.0.1:4318<br>
+                  Content-Type: application/x-protobuf<br>
+                  Payload size: ~320 bytes (compact wire)
+                </div>
+              </div>
+
+              <div class="node-box">
+                <div class="node-header">
+                  <span class="node-name">⚡ Loopback Socket</span>
+                  <span class="node-tag">HTTP/1.1 Keep-Alive</span>
+                </div>
+                <p class="node-content">Transport via persistent loopback TCP socket. Takes only ~1.5 ms on macOS kernel networking.</p>
+                <div class="signal-data">
+                  TCP Loopback latency: 0.1 - 0.3 ms<br>
+                  HTTP request/response handshake: ~1.2 ms
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="transport-arrow">⬇ FastAPI Receiver Ingestion</div>
+
+          <!-- STAGE 3: INGESTION -->
+          <div class="pipeline-stage">
+            <div class="stage-indicator" style="border-left-color: #eab308;">
+              <span class="stage-step" style="color: #eab308;">Stage 3: Ingestion</span>
+              <h3 class="stage-title">OTLP Ingestion</h3>
+              <p class="stage-subtitle">FastAPI Consumer Service</p>
+            </div>
+            <div class="stage-cards">
+              <div class="node-box">
+                <div class="node-header">
+                  <span class="node-name">📥 OTLP/HTTP Receiver</span>
+                  <span class="node-tag">POST /v1/logs</span>
+                </div>
+                <p class="node-content">Deserializes binary buffer into native Python data models using OpenTelemetry protobuf schema.</p>
+                <div class="signal-data">
+                  logs_service_pb2.ExportLogsServiceRequest<br>
+                  .FromString(body_bytes)<br>
+                  Parse execution time: ~1.0 ms
+                </div>
+              </div>
+
+              <div class="node-box">
+                <div class="node-header">
+                  <span class="node-name">🔄 State Engine & History</span>
+                  <span class="node-tag">Asyncio Lock</span>
+                </div>
+                <p class="node-content">Normalizes state to OK/WARNING/CRITICAL, calculates ingest latency against producer timestamp, and appends to rolling 50-event history.</p>
+                <div class="signal-data">
+                  current_state = {status: "WARNING", color: "#eab308"}<br>
+                  ingest_latency_ms: 4.48 ms
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="transport-arrow">⬇ WebSocket Real-Time Push</div>
+
+          <!-- STAGE 4: DISPLAY -->
+          <div class="pipeline-stage">
+            <div class="stage-indicator" style="border-left-color: #a855f7;">
+              <span class="stage-step" style="color: #a855f7;">Stage 4: Display</span>
+              <h3 class="stage-title">GUI Render</h3>
+              <p class="stage-subtitle">Real-Time Web Dashboard</p>
+            </div>
+            <div class="stage-cards">
+              <div class="node-box">
+                <div class="node-header">
+                  <span class="node-name">📡 WebSocket Connection</span>
+                  <span class="node-tag">ws://localhost:4318/ws</span>
+                </div>
+                <p class="node-content">Pushes JSON event frame to all connected browser sockets with zero polling delay.</p>
+                <div class="signal-data">
+                  {type: "state_update", current_state: {...}}<br>
+                  Broadcast time: &lt; 0.8 ms
+                </div>
+              </div>
+
+              <div class="node-box">
+                <div class="node-header">
+                  <span class="node-name">🖥️ Traffic Light UI</span>
+                  <span class="node-tag">index.html</span>
+                </div>
+                <p class="node-content">Browser receives frame, calculates E2E latency, animates glowing traffic light badge and prepends audit log.</p>
+                <div class="signal-data">
+                  Visual Alert: 🟡 WARNING (Amber Glow)<br>
+                  Total Pipeline Latency: ~6.6 ms
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 2: 10,000 SERVER ARCHITECTURE -->
+    <div id="view-scale-arch" class="tab-view">
+      <div>
+        <h2 class="section-title"><span>🌐</span> Enterprise Scale: 10,000-Server Production Topology</h2>
+        <p class="section-desc">How to evolve from a single-machine POC to an infrastructure ingesting millions of telemetry signals per second across data centers.</p>
+      </div>
+
+      <div class="grid-2col">
+        <!-- Scale Dimension Table -->
+        <div class="feature-card">
+          <h3 class="feature-title">📊 Scale Capacity Comparison</h3>
+          <table class="spec-table">
+            <thead>
+              <tr>
+                <th>Dimension</th>
+                <th>Local POC</th>
+                <th>10,000-Server Grid</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Servers Monitored</strong></td>
+                <td>1 (Local Mac)</td>
+                <td>10,000 Instances / Nodes</td>
+              </tr>
+              <tr>
+                <td><strong>Signals / Sec</strong></td>
+                <td>~1 - 10 / sec</td>
+                <td><strong>150,000 - 500,000 / sec</strong></td>
+              </tr>
+              <tr>
+                <td><strong>Data Volume / Day</strong></td>
+                <td>&lt; 50 MB</td>
+                <td><strong>4.2 TB - 12.8 TB / day</strong></td>
+              </tr>
+              <tr>
+                <td><strong>Ingest Transport</strong></td>
+                <td>HTTP/1.1 Loopback</td>
+                <td><strong>gRPC + HTTP/2 (mTLS + Compression)</strong></td>
+              </tr>
+              <tr>
+                <td><strong>Buffering Tier</strong></td>
+                <td>None (In-memory)</td>
+                <td><strong>Distributed Kafka / Redpanda Cluster</strong></td>
+              </tr>
+              <tr>
+                <td><strong>Storage Engine</strong></td>
+                <td>In-Memory Dict (50 items)</td>
+                <td><strong>ClickHouse (OLAP) + Redis (State Cache)</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Tiered Pipeline -->
+        <div class="feature-card">
+          <h3 class="feature-title">🏗️ Tiered Ingestion Pipeline</h3>
+          <p class="feature-text">To prevent 10,000 servers from overwhelming central collectors or dropping events during network blips, the architecture uses a <strong>3-Tier Aggregation Model</strong>:</p>
+          <div class="signal-data" style="line-height: 1.8;">
+            <strong>Tier 1: Node Agent (DaemonSet / Local Daemon)</strong><br>
+            • Runs as lightweight sidecar on each of the 10,000 hosts<br>
+            • Gathers host metrics + container logs + span traces<br>
+            • Local disk/memory buffer prevents data loss if uplink drops<br><br>
+            <strong>Tier 2: Regional OpenTelemetry Gateway Layer</strong><br>
+            • Pool of 20-40 autoscaling OTel Collector Gateway instances per DC<br>
+            • Enforces tail-sampling, deduplication, and PII masking<br><br>
+            <strong>Tier 3: Distributed Message Streaming Buffer</strong><br>
+            • Apache Kafka or Redpanda (multi-broker cluster)<br>
+            • Decouples producer ingestion burst from database writers
+          </div>
+        </div>
+      </div>
+
+      <!-- Architectural Layers Detail -->
+      <div class="diagram-panel" style="margin-top: 1.5rem;">
+        <h3 style="margin-bottom: 1.25rem; font-size: 1.2rem;">Detailed 10,000-Server Dataflow Topology</h3>
+        <div class="grid-3col">
+          <div class="node-box" style="border-top: 4px solid #38bdf8;">
+            <div class="node-name">1. Edge Tier (10,000 Nodes)</div>
+            <p class="node-content">Each server runs the <strong>OpenTelemetry Collector Contrib Agent</strong>. Apps send to <span class="code-pill">localhost:4317</span> via gRPC. Collector batches records (512 KB or 250ms) with Zstandard (<span class="code-pill">zstd</span>) compression.</p>
+          </div>
+          <div class="node-box" style="border-top: 4px solid #818cf8;">
+            <div class="node-name">2. Gateway & Stream Buffer</div>
+            <p class="node-content">Regional OTel Gateways behind NLBs push directly into a partitioned <strong>Redpanda/Kafka</strong> topic (<span class="code-pill">otel.state.events</span>). Buffers up to 72 hours of telemetry during backend outages.</p>
+          </div>
+          <div class="node-box" style="border-top: 4px solid #a855f7;">
+            <div class="node-name">3. Real-Time Stream & Storage</div>
+            <p class="node-content"><strong>Flink / Bytewax</strong> processes state transitions in &lt;5 ms. Current state cached in <strong>Redis Cluster</strong>. Historical telemetry written in micro-batches to <strong>ClickHouse</strong> for sub-second analytical queries.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 3: RELIABILITY & OUTAGE STRATEGY -->
+    <div id="view-reliability" class="tab-view">
+      <div>
+        <h2 class="section-title"><span>🛡️</span> High Availability & Disaster Recovery (Outage Scenarios)</h2>
+        <p class="section-desc">Guaranteeing zero data loss, zero alert blackout, and high throughput during server, network, or full datacenter outages.</p>
+      </div>
+
+      <div class="grid-2col">
+        <!-- Outage Scenario 1 -->
+        <div class="feature-card">
+          <div class="feature-icon">🏢</div>
+          <h3 class="feature-title">Scenario A: Full Datacenter Outage (Region Failure)</h3>
+          <p class="feature-text"><strong>Problem:</strong> DC-East loses power or fiber connectivity. Telemetry must not stall, and global dashboards must immediately flag DC-East as down without crashing.</p>
+          <div class="callout" style="border-left-color: #ef4444; background: rgba(239, 68, 68, 0.08);">
+            <strong>Solution Architecture:</strong><br>
+            • <strong>Anycast BGP + Route 53 / Cloudflare GeoDNS</strong> automatically reroutes edge traffic to active regions (DC-West / DC-EU).<br>
+            • <strong>Multi-Region Kafka MirrorMaker 2:</strong> Mirroring replicates critical state topics across regions.<br>
+            • <strong>Dead-Man's Snitch / Heartbeat Engine:</strong> If an entire cluster stops emitting signals for 15 seconds, a synthetic out-of-band Critical Red Alert is raised automatically.
+          </div>
+        </div>
+
+        <!-- Outage Scenario 2 -->
+        <div class="feature-card">
+          <div class="feature-icon">⚡</div>
+          <h3 class="feature-title">Scenario B: Central Ingest or DB Outage (Spike / Crash)</h3>
+          <p class="feature-text"><strong>Problem:</strong> ClickHouse or the indexing database locks up under an alert storm (e.g., thousands of simultaneous cascaded errors).</p>
+          <div class="callout" style="border-left-color: #eab308; background: rgba(234, 179, 8, 0.08);">
+            <strong>Solution Architecture:</strong><br>
+            • <strong>Persistent Queue in OTel Agents:</strong> Each local collector has a disk-backed queue (<span class="code-pill">file_storage</span> extension) spooling up to 5 GB locally without memory bloat.<br>
+            • <strong>Kafka Asynchronous Decoupling:</strong> The UI queries Redis for live state and Kafka streams for alerts. Ingestion never halts even if persistent storage is down for maintenance.<br>
+            • <strong>Adaptive Backpressure:</strong> OTel SDKs drop debug/trace data first while prioritizing error/alert state signals.
+          </div>
+        </div>
+      </div>
+
+      <!-- Alleviating Bottlenecks -->
+      <div class="diagram-panel" style="margin-top: 1.5rem;">
+        <h3 style="margin-bottom: 1rem; font-size: 1.2rem;">How Bottlenecks Are Alleviated at 10,000-Server Scale</h3>
+        <table class="spec-table">
+          <thead>
+            <tr>
+              <th>Potential Bottleneck</th>
+              <th>Root Cause</th>
+              <th>Production Mitigation Strategy</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>TCP / TLS Connection Exhaustion</strong></td>
+              <td>10,000 servers opening and closing connections to a central service.</td>
+              <td><strong>Local Collector Proxying:</strong> Apps connect to <span class="code-pill">127.0.0.1</span> via Unix domain sockets or HTTP/2 gRPC. Only ~40 regional gateways talk over long-lived mTLS streams to backends.</td>
+            </tr>
+            <tr>
+              <td><strong>JSON Deserialization Overhead</strong></td>
+              <td>Parsing millions of JSON strings wastes massive CPU cycles.</td>
+              <td><strong>OTLP Protobuf + Zstandard:</strong> Binary serialization uses 85% less bandwidth and parses 10x faster than JSON.</td>
+            </tr>
+            <tr>
+              <td><strong>Alert Storm Flooding</strong></td>
+              <td>A network partition triggers 10,000 servers to emit CRITICAL alerts simultaneously.</td>
+              <td><strong>Collector Grouping & Deduplication:</strong> <span class="code-pill">groupbyattrs</span> and deduplication processors aggregate 5,000 identical errors into a single count summary event per second.</td>
+            </tr>
+            <tr>
+              <td><strong>WebSocket Fanout Overload</strong></td>
+              <td>Pushing 200k events/sec directly to 500 web dashboard operators melts browser DOM.</td>
+              <td><strong>Rate Throttling & Delta Broadcasting:</strong> Backend pushes state delta changes at 10 Hz (every 100ms) rather than raw per-event push.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- VIEW 4: RECOMMENDED OSS TOOLING -->
+    <div id="view-tooling" class="tab-view">
+      <div>
+        <h2 class="section-title"><span>🛠️</span> Battle-Tested Open Source Technology Stack</h2>
+        <p class="section-desc">Recommended open-source tooling for an enterprise-grade, cloud-agnostic telemetry platform.</p>
+      </div>
+
+      <div class="grid-3col">
+        <div class="feature-card">
+          <div class="node-header">
+            <span class="feature-title">Collector & Agent</span>
+            <span class="node-tag" style="background:#0284c7; color:#fff;">CNCF</span>
+          </div>
+          <p class="feature-text"><strong>OpenTelemetry Collector Contrib</strong></p>
+          <p class="node-content">Universal vendor-neutral telemetry daemon. Supports file-backed queues, tail-sampling, resource detection, and routing to multiple destinations simultaneously.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="node-header">
+            <span class="feature-title">Streaming & Buffer</span>
+            <span class="node-tag" style="background:#dc2626; color:#fff;">Zero Loss</span>
+          </div>
+          <p class="feature-text"><strong>Redpanda / Apache Kafka</strong></p>
+          <p class="node-content">C++ Kafka-compatible streaming engine with zero JVM garbage collection pauses. Handles millions of OTLP events/sec per broker with predictable sub-millisecond p99 latencies.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="node-header">
+            <span class="feature-title">Live Cache & State</span>
+            <span class="node-tag" style="background:#b91c1c; color:#fff;">Sub-MS</span>
+          </div>
+          <p class="feature-text"><strong>Redis Cluster / Dragonfly</strong></p>
+          <p class="node-content">Ultra-fast in-memory key-value store holding the latest state of all 10,000 servers (<span class="code-pill">HSET server:node-491 status "CRITICAL"</span>) for instant dashboard retrieval.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="node-header">
+            <span class="feature-title">Long-Term Columnar DB</span>
+            <span class="node-tag" style="background:#ea580c; color:#fff;">Petabyte</span>
+          </div>
+          <p class="feature-text"><strong>ClickHouse</strong></p>
+          <p class="node-content">Blazing-fast columnar analytical database. Native support for OTel schema, compression ratios up to 90%, and queries over billions of log records in &lt; 200 ms.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="node-header">
+            <span class="feature-title">Alert Rules & Engine</span>
+            <span class="node-tag" style="background:#d97706; color:#fff;">Standard</span>
+          </div>
+          <p class="feature-text"><strong>Prometheus Alertmanager / Vector</strong></p>
+          <p class="node-content">Deduplicates, groups, and routes alerts to PagerDuty, Slack, Webhooks, or automated self-healing controllers with inhibition rules.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="node-header">
+            <span class="feature-title">Visualization GUI</span>
+            <span class="node-tag" style="background:#4f46e5; color:#fff;">Dashboard</span>
+          </div>
+          <p class="feature-text"><strong>Grafana OSS + Custom Web UI</strong></p>
+          <p class="node-content">Provides executive dashboards, tile grids representing the 10,000 servers (color-coded heatmap), and direct drilldown into individual traces and logs.</p>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    function switchTab(viewId, btnElement) {
+      // Hide all tabs
+      document.querySelectorAll('.tab-view').forEach(view => {
+        view.classList.remove('active');
+      });
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+      });
+
+      // Show target tab
+      document.getElementById('view-' + viewId).classList.add('active');
+      btnElement.classList.add('active');
+    }
+  </script>
+</body>
+</html>

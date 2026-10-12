@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpenTelemetry Real-Time State Dashboard</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --green: #22c55e;
+      --yellow: #eab308;
+      --red: #ef4444;
+      --gray: #64748b;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 2rem;
+    }
+
+    .container {
+      max-width: 1080px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 1rem;
+    }
+
+    .title-group h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .title-group p {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-top: 0.25rem;
+    }
+
+    .conn-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 0.35rem 0.75rem;
+      border-radius: 9999px;
+      background: #1e293b;
+      border: 1px solid var(--card-border);
+    }
+
+    .conn-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--gray);
+    }
+    .conn-dot.connected { background: var(--green); box-shadow: 0 0 8px var(--green); }
+    .conn-dot.disconnected { background: var(--red); }
+
+    /* Top Grid: Indicator + Metadata */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.6fr;
+      gap: 1.5rem;
+    }
+
+    @media (max-width: 768px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+    }
+
+    /* Traffic Light State Tile */
+    .status-tile {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 2rem 1.5rem;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.4s ease, box-shadow 0.4s ease;
+    }
+
+    .status-tile::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 6px;
+      background: var(--gray);
+      transition: background-color 0.4s ease;
+    }
+
+    .status-tile.state-OK::before { background: var(--green); }
+    .status-tile.state-WARNING::before { background: var(--yellow); }
+    .status-tile.state-CRITICAL::before { background: var(--red); }
+
+    .pulse-glow {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 140px;
+      height: 140px;
+      border-radius: 50%;
+      opacity: 0.15;
+      transition: background-color 0.4s ease;
+      filter: blur(25px);
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .status-badge-icon {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.2rem;
+      margin-bottom: 1rem;
+      z-index: 1;
+      border: 2px solid transparent;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .status-label {
+      font-size: 1.8rem;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      z-index: 1;
+      transition: color 0.3s ease;
+    }
+
+    .status-subtext {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      margin-top: 0.4rem;
+      z-index: 1;
+    }
+
+    /* Meta Info Card */
+    .meta-details {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      justify-content: center;
+    }
+
+    .meta-row {
+      display: flex;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      padding-bottom: 0.5rem;
+      font-size: 0.9rem;
+    }
+
+    .meta-label {
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .meta-value {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      color: var(--text);
+      font-weight: 600;
+      word-break: break-all;
+    }
+
+    .banner-message {
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: 8px;
+      padding: 0.85rem;
+      font-size: 0.95rem;
+      border-left: 4px solid var(--gray);
+      margin-top: 0.5rem;
+      transition: border-color 0.3s ease;
+    }
+
+    /* Event Logs Section */
+    .history-card {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .history-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .history-header h2 {
+      font-size: 1.15rem;
+      font-weight: 600;
+    }
+
+    .clear-btn {
+      background: transparent;
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      padding: 0.25rem 0.75rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+    .clear-btn:hover {
+      background: #334155;
+      color: #fff;
+    }
+
+    .table-container {
+      max-height: 380px;
+      overflow-y: auto;
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+
+    th {
+      background: #111827;
+      text-align: left;
+      padding: 0.75rem 1rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    td {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      vertical-align: middle;
+    }
+
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 0.2rem 0.55rem;
+      border-radius: 4px;
+      font-weight: 700;
+      font-size: 0.75rem;
+      letter-spacing: 0.04em;
+    }
+
+    .pill-OK { background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.4); }
+    .pill-WARNING { background: rgba(234, 179, 8, 0.2); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.4); }
+    .pill-CRITICAL { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); }
+    .pill-UNKNOWN { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.4); }
+
+    .attr-code {
+      font-family: monospace;
+      font-size: 0.75rem;
+      color: #cbd5e1;
+      background: #0f172a;
+      padding: 0.2rem 0.4rem;
+      border-radius: 4px;
+      display: inline-block;
+      margin-top: 0.25rem;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <div class="title-group">
+      <h1>
+        <span>📡</span> OpenTelemetry Live Status Dashboard
+      </h1>
+      <p>Native OTLP/HTTP Protobuf Ingestion + WebSocket Real-Time Broadcast</p>
+    </div>
+    <div style="display:flex; align-items:center; gap: 1rem;">
+      <a href="/architecture" target="_blank" style="color: #38bdf8; text-decoration: none; font-size: 0.85rem; font-weight: 600; border: 1px solid rgba(56, 189, 248, 0.4); padding: 0.35rem 0.8rem; border-radius: 6px; background: rgba(56, 189, 248, 0.08);">
+        📐 Architecture & 10k Scale ↗
+      </a>
+      <div class="conn-badge">
+        <span class="conn-dot" id="ws-dot"></span>
+        <span id="ws-status">Connecting...</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="dashboard-grid">
+    <!-- State Tile -->
+    <div class="card status-tile" id="status-card">
+      <div class="pulse-glow" id="pulse-glow"></div>
+      <div class="status-badge-icon" id="status-icon">⚪</div>
+      <div class="status-label" id="status-text">INITIALIZING</div>
+      <div class="status-subtext" id="status-subtext">Waiting for first OTel event...</div>
+    </div>
+
+    <!-- Active Details -->
+    <div class="card meta-details">
+      <div class="meta-row">
+        <span class="meta-label">Monitored Service</span>
+        <span class="meta-value" id="meta-service">-</span>
+      </div>
+      <div class="meta-row">
+        <span class="meta-label">Severity Level</span>
+        <span class="meta-value" id="meta-severity">-</span>
+      </div>
+      <div class="meta-row">
+        <span class="meta-label">Last Event Time</span>
+        <span class="meta-value" id="meta-timestamp">-</span>
+      </div>
+      <div class="meta-row">
+        <span class="meta-label">Pipeline Latency (Event -> GUI)</span>
+        <span class="meta-value" id="meta-latency" style="color:#a855f7;">-</span>
+      </div>
+      <div class="meta-row">
+        <span class="meta-label">Telemetry Pipeline</span>
+        <span class="meta-value" style="color:#38bdf8;">OTel SDK ➔ OTLP/HTTP ➔ Local Dashboard</span>
+      </div>
+      <div class="banner-message" id="meta-message">
+        No state events received yet. Start the producer service to stream events.
+      </div>
+    </div>
+  </div>
+
+  <!-- Rolling Events History -->
+  <div class="card history-card">
+    <div class="history-header">
+      <h2>Recent State Transitions & Alert Log</h2>
+      <button class="clear-btn" onclick="clearHistory()">Clear History</button>
+    </div>
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 120px;">Status</th>
+            <th style="width: 100px;">Severity</th>
+            <th style="width: 150px;">Timestamp</th>
+            <th style="width: 110px;">E2E Latency</th>
+            <th>Message & Attributes</th>
+          </tr>
+        </thead>
+        <tbody id="history-tbody">
+          <tr>
+            <td colspan="4" style="text-align:center; color: var(--text-muted); padding: 2rem;">
+              No alerts logged yet.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  const wsDot = document.getElementById("ws-dot");
+  const wsStatus = document.getElementById("ws-status");
+  const statusCard = document.getElementById("status-card");
+  const statusIcon = document.getElementById("status-icon");
+  const statusText = document.getElementById("status-text");
+  const statusSubtext = document.getElementById("status-subtext");
+  const pulseGlow = document.getElementById("pulse-glow");
+
+  const metaService = document.getElementById("meta-service");
+  const metaSeverity = document.getElementById("meta-severity");
+  const metaTimestamp = document.getElementById("meta-timestamp");
+  const metaLatency = document.getElementById("meta-latency");
+  const metaMessage = document.getElementById("meta-message");
+  const historyTbody = document.getElementById("history-tbody");
+
+  let localEvents = [];
+
+  function formatTime(isoStr) {
+    if (!isoStr) return "-";
+    try {
+      const d = new Date(isoStr);
+      return d.toLocaleTimeString() + "." + String(d.getMilliseconds()).padStart(3, '0');
+    } catch {
+      return isoStr;
+    }
+  }
+
+  function updateStatusTile(state, clientLatencyMs) {
+    const status = state.status || "UNKNOWN";
+    const color = state.color || "#64748b";
+
+    statusCard.className = `card status-tile state-${status}`;
+    statusText.innerText = status;
+    statusText.style.color = color;
+
+    metaService.innerText = state.service_name || "unknown";
+    metaSeverity.innerText = state.severity || "INFO";
+    metaTimestamp.innerText = formatTime(state.timestamp);
+    
+    // Display latency
+    const displayLatency = clientLatencyMs != null ? clientLatencyMs : state.ingest_latency_ms;
+    if (displayLatency != null && displayLatency > 0) {
+      metaLatency.innerHTML = `<span style="font-weight:700; color:#38bdf8;">${displayLatency} ms</span> <span style="font-size:0.75rem; color:#94a3b8;">(Producer ➔ GUI)</span>`;
+    } else {
+      metaLatency.innerText = "-";
+    }
+
+    metaMessage.innerText = state.message || "";
+    metaMessage.style.borderLeftColor = color;
+
+    pulseGlow.style.backgroundColor = color;
+
+    if (status === "OK") {
+      statusIcon.innerText = "🟢";
+      statusIcon.style.background = "rgba(34, 197, 94, 0.15)";
+      statusIcon.style.borderColor = "rgba(34, 197, 94, 0.5)";
+      statusSubtext.innerText = "Service functioning nominally";
+    } else if (status === "WARNING") {
+      statusIcon.innerText = "🟡";
+      statusIcon.style.background = "rgba(234, 179, 8, 0.15)";
+      statusIcon.style.borderColor = "rgba(234, 179, 8, 0.5)";
+      statusSubtext.innerText = "Performance degraded or elevated threshold";
+    } else if (status === "CRITICAL") {
+      statusIcon.innerText = "🔴";
+      statusIcon.style.background = "rgba(239, 68, 68, 0.15)";
+      statusIcon.style.borderColor = "rgba(239, 68, 68, 0.5)";
+      statusSubtext.innerText = "Critical alert / service error detected";
+    } else {
+      statusIcon.innerText = "⚪";
+      statusIcon.style.background = "rgba(100, 116, 139, 0.15)";
+      statusIcon.style.borderColor = "rgba(100, 116, 139, 0.5)";
+      statusSubtext.innerText = "Waiting for state signal";
+    }
+  }
+
+  function renderHistoryTable() {
+    if (localEvents.length === 0) {
+      historyTbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color: var(--text-muted); padding: 2rem;">No alerts logged yet.</td></tr>`;
+      return;
+    }
+
+    historyTbody.innerHTML = localEvents.map(evt => {
+      const status = evt.status || "UNKNOWN";
+      const attrs = evt.attributes ? JSON.stringify(evt.attributes) : "";
+      const lat = evt.e2e_latency_ms != null ? `${evt.e2e_latency_ms} ms` : (evt.ingest_latency_ms ? `${evt.ingest_latency_ms} ms` : "-");
+      return `
+        <tr>
+          <td><span class="pill pill-${status}">${status}</span></td>
+          <td><code>${evt.severity || 'INFO'}</code></td>
+          <td style="color: var(--text-muted); font-size: 0.8rem;">${formatTime(evt.timestamp)}</td>
+          <td><span style="font-family: monospace; font-weight: 600; color: #38bdf8;">${lat}</span></td>
+          <td>
+            <div style="font-weight: 500;">${evt.message}</div>
+            ${attrs ? `<span class="attr-code">${attrs}</span>` : ""}
+          </td>
+        </tr>
+      `;
+    }).join("");
+  }
+
+  function clearHistory() {
+    localEvents = [];
+    renderHistoryTable();
+  }
+
+  function connectWebSocket() {
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    const socket = new WebSocket(wsUrl);
+
+    socket.onopen = () => {
+      wsDot.className = "conn-dot connected";
+      wsStatus.innerText = "Live Stream Active";
+    };
+
+    socket.onmessage = (event) => {
+      try {
+        const nowMs = Date.now();
+        const data = JSON.parse(event.data);
+        if (data.type === "init") {
+          updateStatusTile(data.current_state);
+          localEvents = data.history || [];
+          renderHistoryTable();
+        } else if (data.type === "state_update") {
+          const emittedMs = data.current_state?.attributes?.emitted_at_ms;
+          let e2eLatency = null;
+          if (emittedMs) {
+            e2eLatency = Math.max(0, Math.round(nowMs - emittedMs));
+          }
+          updateStatusTile(data.current_state, e2eLatency);
+          if (data.history_item) {
+            if (e2eLatency != null) {
+              data.history_item.e2e_latency_ms = e2eLatency;
+            }
+            localEvents.unshift(data.history_item);
+            if (localEvents.length > 50) localEvents.pop();
+            renderHistoryTable();
+          }
+        }
+      } catch (err) {
+        console.error("Error processing WebSocket payload:", err);
+      }
+    };
+
+    socket.onclose = () => {
+      wsDot.className = "conn-dot disconnected";
+      wsStatus.innerText = "Disconnected (reconnecting...)";
+      setTimeout(connectWebSocket, 2000);
+    };
+
+    socket.onerror = () => {
+      socket.close();
+    };
+  }
+
+  // Connect on page load
+  window.addEventListener("DOMContentLoaded", () => {
+    connectWebSocket();
+  });
+</script>
+
+</body>
+</html>
